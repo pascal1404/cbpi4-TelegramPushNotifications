@@ -1,0 +1,2 @@
+include TelegramPushNotifications/config.yaml
+recursive-include TelegramPushNotifications/static *
