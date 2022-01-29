@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 class TelegramCallbacks(CBPiExtension):
 
+    def __init__(self,cbpi):
+        self.cbpi = cbpi
+        self.controller : StepController = cbpi.step
+        self.cbpi.register(self, "/step2")
+
     @events.register(events.CallbackQuery)
     async def callbackQuery(event):
         message = await event.get_message()
@@ -43,10 +48,12 @@ class TelegramCallbacks(CBPiExtension):
     @events.register(events.NewMessage(pattern='/next'))
     async def next(event):
         await self.controller.next()
-        raise events.Stoppropagation
+        raise events.StopPropagation
         
     @events.register(events.NewMessage(pattern='/help'))
     async def help(event):
+        bot = event.client
+        chat_id = event.chat_id
         tmp=""
         cmd_list = [{"command":"help","description":"get a list of all commands with description"},
                     {"command":"next","description":"Next Brew Step"},
@@ -60,42 +67,73 @@ class TelegramCallbacks(CBPiExtension):
         for items in cmd_list:
             tmp=tmp+("/%s: %s\n" %(items["command"],items["description"]))
         title= 'List of Commands:'
-        await bot.send_message(int(telegram_chat_id), "**{}** \n__{}__".format(title,tmp))
-        raise events.Stoppropagation
+        await event.respond("**{}** \n__{}__".format(title,tmp))
+        raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/start'))
     async def start(event):
         await self.controller.start()
-        raise events.Stoppropagation
+        raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/stop'))
     async def stop(event):
         await self.controller.stop()
-        raise events.Stoppropagation
+        raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/set_target'))
     async def setTarget(event):
-        await bot.send_message(int(telegram_chat_id), "**Choose Item for set_target_temp**",buttons=buttons)
-        raise events.Stoppropagation
+        bot = event.client
+        buttons = []
+        logger.info(event)
+        kettles = self.cbpi.kettle.get_state()
+        logger.info(event)
+        fermenter = self.cbpi.fermenter.get_state()
+        for value in kettles["data"]:
+            # logger.info(value["name"])
+            # logger.warning(self.cbpi.sensor.get_sensor_value(value["id"])["value"])
+            buttons.append(Button.inline(value["name"],value["id"]))
+        for value in fermenter["data"]:
+            # logger.info(value["name"])
+            buttons.append(Button.inline(value["name"],value["id"]))
+        await event.respond("**Choose Item for set_target_temp**",buttons=buttons)
+        raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/get_target'))
     async def getTarget(event):
-        await bot.send_message(int(telegram_chat_id), "**Choose Item for get_target_temp**",buttons=buttons)
-        raise events.Stoppropagation
+        bot = event.client
+        buttons = []
+        logger.info(self)
+        kettles = self.cbpi.kettle.get_state()
+        fermenter = self.cbpi.fermenter.get_state()
+        for value in kettles["data"]:
+            # logger.info(value["name"])
+            # logger.warning(self.cbpi.sensor.get_sensor_value(value["id"])["value"])
+            buttons.append(Button.inline(value["name"],value["id"]))
+        for value in fermenter["data"]:
+            # logger.info(value["name"])
+            buttons.append(Button.inline(value["name"],value["id"]))
+        await event.respond("**Choose Item for get_target_temp**",buttons=buttons)
+        raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/get_timer'))
     async def getTimer(event):
+        bot = event.client
         steps = self.cbpi.step.get_state()
         for value in steps["steps"]:
             if value["status"] == "A":
-                await bot.send_message(int(telegram_chat_id), "timer of step '{}' is {}.".format(value["name"],value["state_text"]))
+                await event.respond("timer of step '{}' is {}.".format(value["name"],value["state_text"]))
             logger.warning("{}: {}".format(value["name"],value["status"]))
         
-        raise events.Stoppropagation
+        raise events.StopPropagation
     
     @events.register(events.NewMessage)
     async def new_message_handler(event):
-        async for message in bot.iter_messages(int(telegram_chat_id),limit=2):
+        bot = event.client
+        sender = await event.get_sender()
+        logger.warning(sender)
+        chat_id = event.chat_id
+        messages = await sender.get_messages(int(chat_id),limit=2)
+        for message in messages:
             if "new target temperature" in message:
                 temp = '999'
                 unit = "°C"
@@ -111,13 +149,13 @@ class TelegramCallbacks(CBPiExtension):
                     for item in fermenter:
                         if item["name"] in message:
                             await self.set_fermenter_target_temp(item["id"],temp)
-                            await bot.send_message(int(telegram_chat_id), "Set Target_temp of {} to {}{}.".format(item["name"],temp,unit))
+                            await event.respond("Set Target_temp of {} to {}{}.".format(item["name"],temp,unit))
                     for item in kettles:
                         if item["id"] in message:
                             await self.set_target_temp(item["id"],temp)
-                            await bot.send_message(int(telegram_chat_id), "Set Target_temp of {} to {}{}.".format(item["name"],temp,unit))
+                            await event.respond("Set Target_temp of {} to {}{}.".format(item["name"],temp,unit))
                 else:
-                    await bot.send_message(int(telegram_chat_id), "**No valid Input for Set Target_temp of {} found!**".format(item["name"]))
+                    await event.respond("**No valid Input for Set Target_temp of {} found!**".format(item["name"]))
 
             if "original gravity" in message:
                 match = re.match(r'^(?=(.|,))([+-]?([0-9]*)(\(.|,)([0-9]+))?)$', event.raw_text)
@@ -125,11 +163,11 @@ class TelegramCallbacks(CBPiExtension):
                 if number is not None:
                     await self.controller.next()
                 else:
-                    await bot.send_message(int(telegram_chat_id), "**No valid Input for measure of original gravity found!**")
+                    await event.respond("**No valid Input for measure of original gravity found!**")
 
         if r'(?i).*moin' or r'(?i).*hi' or r'(?i).*h(a|e)llo' in event.raw_text:
             sender = await event.get_sender()
-            await bot.send_message(int(telegram_chat_id), "Hi {}, use command /help to find a list of all commands.".format(sender))
+            await event.respond("Hi {}, use command /help to find a list of all commands.".format(sender))
         else:
             sender = await event.get_sender()
-            await bot.send_message(int(telegram_chat_id), "Hi {}, I could not parse your text.".format(sender))
+            await event.respond("Hi {}, I could not parse your text.".format(sender))

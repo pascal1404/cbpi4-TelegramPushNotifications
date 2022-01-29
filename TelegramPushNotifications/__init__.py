@@ -9,7 +9,7 @@ from telethon import *
 import re
 import random
 import cbpi
-from . import callbacks
+from .callbacks import TelegramCallbacks
 from cbpi.api import *
 from cbpi.api.config import ConfigType
 from cbpi.api.base import CBPiBase
@@ -127,18 +127,17 @@ class Telegram(CBPiExtension):
                 
             ######################################################## ende Testdaten
             bot = await TelegramClient('bot', int(telegram_api_id), telegram_api_hash).start(bot_token=telegram_bot_token)
-            await bot.send_message(int(telegram_chat_id), "**Hello**\n__I'm your **new** bot!__")
-            # bot.add_event_handler(TelegramCallbacks.callbackQuery)
-            # bot.add_event_handler(TelegramCallbacks.help)
-            # bot.add_event_handler(TelegramCallbacks.next)
-            # bot.add_event_handler(TelegramCallbacks.start)
-            # bot.add_event_handler(TelegramCallbacks.stop)
-            # bot.add_event_handler(TelegramCallbacks.setTarget)
-            # bot.add_event_handler(TelegramCallbacks.getTarget)
-            # bot.add_event_handler(TelegramCallbacks.getTimer)
-            # bot.add_event_handler(TelegramCallbacks.new_message_handler)
-            logger.warning("läuft durch")
-        pass
+            # await bot.send_message(int(telegram_chat_id), "**Hello**\n__I'm your **new** bot!__")
+            bot.add_event_handler(callbacks.TelegramCallbacks.callbackQuery)
+            bot.add_event_handler(callbacks.TelegramCallbacks.help)
+            bot.add_event_handler(callbacks.TelegramCallbacks.next)
+            bot.add_event_handler(callbacks.TelegramCallbacks.start)
+            bot.add_event_handler(callbacks.TelegramCallbacks.stop)
+            bot.add_event_handler(callbacks.TelegramCallbacks.setTarget)
+            bot.add_event_handler(callbacks.TelegramCallbacks.getTarget)
+            bot.add_event_handler(callbacks.TelegramCallbacks.getTimer)
+            bot.add_event_handler(callbacks.TelegramCallbacks.new_message_handler)
+            logger.warning("ende")
 
     async def telegramBotToken(self):
         global telegram_bot_token
