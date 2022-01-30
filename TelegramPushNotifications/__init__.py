@@ -76,32 +76,32 @@ class Telegram(CBPiExtension):
             self.listener_ID = self.cbpi.notification.add_listener(self.messageEvent)
             logger.info("Telegram Bot Listener ID: {}".format(self.listener_ID))
             ############################## Nur zum Testen wie ich an die Daten komme
-            kettles = self.cbpi.kettle.get_state()
-            fermenter = self.cbpi.fermenter.get_state()
-            actors = self.cbpi.actor.get_state()
-            sensors = self.cbpi.sensor.get_state()
-            logger.warning(kettles)
-            logger.info(" ")
-            await self.controller.start()
-            logger.warning(fermenter)
-            logger.info(" ")
-            logger.warning(actors)
-            logger.info(" ")
-            logger.warning(sensors)
-            logger.info(" ")
+            # kettles = self.cbpi.kettle.get_state()
+            # fermenter = self.cbpi.fermenter.get_state()
+            # actors = self.cbpi.actor.get_state()
+            # sensors = self.cbpi.sensor.get_state()
+            # logger.warning(kettles)
+            # logger.info(" ")
+            # await self.controller.start()
+            # logger.warning(fermenter)
+            # logger.info(" ")
+            # logger.warning(actors)
+            # logger.info(" ")
+            # logger.warning(sensors)
+            # logger.info(" ")
             steps = self.cbpi.step.get_state()
             for value in steps["steps"]:
                 step = self.cbpi.step.find_by_id(value["id"])
                 logger.warning("{}".format(value))
                 logger.warning("{}".format(step.instance.summary))
                 logger.warning("{}".format(value["state_text"]))
-            buttons = []
-            for value in kettles["data"]:
-                logger.info(value["name"])
+            # buttons = []
+            # for value in kettles["data"]:
+                # logger.info(value["name"])
                 # logger.warning(self.cbpi.sensor.get_sensor_value(value["id"])["value"])
                 # buttons.append(Button.inline(value["name"],value["id"]))
-            for value in fermenter["data"]:
-                logger.info(value["name"])
+            # for value in fermenter["data"]:
+                # logger.info(value["name"])
                 # buttons.append(Button.inline(value["name"],value["id"]))
 
             # await self.controller.stop()
@@ -127,15 +127,17 @@ class Telegram(CBPiExtension):
                 
             ######################################################## ende Testdaten
             bot = await TelegramClient('bot', int(telegram_api_id), telegram_api_hash).start(bot_token=telegram_bot_token)
-            # await bot.send_message(int(telegram_chat_id), "**Hello**\n__I'm your **new** bot!__")
             bot.add_event_handler(callbacks.TelegramCallbacks.callbackQuery)
             bot.add_event_handler(callbacks.TelegramCallbacks.help)
             bot.add_event_handler(callbacks.TelegramCallbacks.next)
             bot.add_event_handler(callbacks.TelegramCallbacks.start)
             bot.add_event_handler(callbacks.TelegramCallbacks.stop)
+            bot.add_event_handler(callbacks.TelegramCallbacks.reset)
             bot.add_event_handler(callbacks.TelegramCallbacks.setTarget)
             bot.add_event_handler(callbacks.TelegramCallbacks.getTarget)
             bot.add_event_handler(callbacks.TelegramCallbacks.getTimer)
+            bot.add_event_handler(callbacks.TelegramCallbacks.gravity)
+            bot.add_event_handler(callbacks.TelegramCallbacks.inputTemp)
             bot.add_event_handler(callbacks.TelegramCallbacks.new_message_handler)
             logger.warning("ende")
 
@@ -190,9 +192,7 @@ class Telegram(CBPiExtension):
                 logger.warning('Unable to update config')
 
     async def messageEvent(self, cbpi, title, message, type, action):
-        
         if telegram_bot_token is not None and telegram_chat_id is not None:
-            temp = 0
             await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message))
 
 def setup(cbpi):

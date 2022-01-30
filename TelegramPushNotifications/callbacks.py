@@ -1,6 +1,7 @@
 
 # -*- coding: utf-8 -*-
 import os
+import aiohttp
 from aiohttp import web
 import logging
 from unittest.mock import MagicMock, patch
@@ -8,6 +9,7 @@ import asyncio
 from telethon import *
 import re
 import random
+import json
 import cbpi
 from cbpi.api import *
 from cbpi.api.config import ConfigType
@@ -25,31 +27,36 @@ class TelegramCallbacks(CBPiExtension):
     def __init__(self,cbpi):
         self.cbpi = cbpi
         self.controller : StepController = cbpi.step
-        self.cbpi.register(self, "/step2")
 
     @events.register(events.CallbackQuery)
     async def callbackQuery(event):
-        message = await event.get_message()
-        if "get_target_temp" in message:
-            for item in fermenter:
-                if item["id"] == event.data:
-                    await event.edit("Target_temp of {} is {].".format(item["name"],self.get_fermenter_target_temp(item["id"])))
-            for item in kettles:
-                if item["id"] == event.data:
-                    await event.edit("Target_temp of {} {].".format(item["name"],self.get_kettle_target_temp(item["id"])))
-        elif "set_target_temp" in message:
-            for item in fermenter:
-                if item["id"] == event.data:
+        msg = await event.get_message()
+        TEMP_UNIT = await TelegramCallbacks.post_items("config/TEMP_UNIT/","")
+        TEMP_UNIT = TEMP_UNIT[1:-1]
+        kettles = await TelegramCallbacks.get_items("kettle")
+        fermenter = await TelegramCallbacks.get_items("fermenter")
+        if "get_target_temp" in msg.message:
+            for item in fermenter["data"]:
+                if item["id"] in str(event.data):
+                    await event.edit("Target_temp of {} is {}°{}.".format(item["name"],item["target_temp"],TEMP_UNIT))
+            for item in kettles["data"]:
+                if item["id"] in str(event.data):
+                    await event.edit("Target_temp of {} {}°{}.".format(item["name"],item["target_temp"],TEMP_UNIT))
+        elif "set_target_temp" in msg.message:
+            for item in fermenter["data"]:
+                if item["id"] in str(event.data):
                     await event.edit("Enter the new target temperature for {}:".format(item["name"]))
-            for item in kettles:
-                if item["id"] == event.data:
+            for item in kettles["data"]:
+                if item["id"] in str(event.data):
                     await event.edit("Enter the new target temperature for {}:".format(item["name"]))
+        raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/next'))
     async def next(event):
-        await self.controller.next()
+        # await self.controller.next()
+        await TelegramCallbacks.post_items("step2/next","")
         raise events.StopPropagation
-        
+    
     @events.register(events.NewMessage(pattern='/help'))
     async def help(event):
         bot = event.client
@@ -72,102 +79,125 @@ class TelegramCallbacks(CBPiExtension):
     
     @events.register(events.NewMessage(pattern='/start'))
     async def start(event):
-        await self.controller.start()
+        # await self.controller.start()
+        await TelegramCallbacks.post_items("step2/start","")
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/stop'))
     async def stop(event):
-        await self.controller.stop()
+        # await self.controller.stop()
+        await TelegramCallbacks.post_items("step2/stop","")
+        raise events.StopPropagation
+    
+    @events.register(events.NewMessage(pattern='/reset'))
+    async def reset(event):
+        # await self.controller.reset()
+        await TelegramCallbacks.post_items("step2/reset","")
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/set_target'))
     async def setTarget(event):
-        bot = event.client
         buttons = []
-        logger.info(event)
-        kettles = self.cbpi.kettle.get_state()
-        logger.info(event)
-        fermenter = self.cbpi.fermenter.get_state()
+        kettles = await TelegramCallbacks.get_items("kettle")
+        fermenter = await TelegramCallbacks.get_items("fermenter")
         for value in kettles["data"]:
-            # logger.info(value["name"])
-            # logger.warning(self.cbpi.sensor.get_sensor_value(value["id"])["value"])
             buttons.append(Button.inline(value["name"],value["id"]))
         for value in fermenter["data"]:
-            # logger.info(value["name"])
             buttons.append(Button.inline(value["name"],value["id"]))
         await event.respond("**Choose Item for set_target_temp**",buttons=buttons)
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/get_target'))
     async def getTarget(event):
-        bot = event.client
         buttons = []
-        logger.info(self)
-        kettles = self.cbpi.kettle.get_state()
-        fermenter = self.cbpi.fermenter.get_state()
+        kettles = await TelegramCallbacks.get_items("kettle")
+        fermenter = await TelegramCallbacks.get_items("fermenter")
         for value in kettles["data"]:
-            # logger.info(value["name"])
-            # logger.warning(self.cbpi.sensor.get_sensor_value(value["id"])["value"])
             buttons.append(Button.inline(value["name"],value["id"]))
         for value in fermenter["data"]:
-            # logger.info(value["name"])
             buttons.append(Button.inline(value["name"],value["id"]))
         await event.respond("**Choose Item for get_target_temp**",buttons=buttons)
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/get_timer'))
     async def getTimer(event):
-        bot = event.client
-        steps = self.cbpi.step.get_state()
+        # steps = self.cbpi.step.get_state()
+        steps = await TelegramCallbacks.get_items("step2")
+        logger.info(steps)
         for value in steps["steps"]:
             if value["status"] == "A":
                 await event.respond("timer of step '{}' is {}.".format(value["name"],value["state_text"]))
             logger.warning("{}: {}".format(value["name"],value["status"]))
-        
         raise events.StopPropagation
     
+    @events.register(events.NewMessage(pattern=r".*(°P|Brix).*"))
+    async def gravity(event):
+        match = re.match(r'^([0-9]+(\.[0-9])?(°P| Brix))', event.raw_text)
+        if match is not None:
+            gravity = match.group(1)
+            logger.info(gravity)
+            # await self.controller.next()
+            await TelegramCallbacks.post_items("step2/next","")
+        else:
+            await event.respond("**No valid Input for original gravity found!**(Please use Format XX.X°P or XX.X Brix)")
+        raise events.StopPropagation
+    
+    async def get_items(name):
+        res = " "
+        url="http://127.0.0.1:8000/"+name+"/"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                res = await response.text()
+                # logger.info(res)
+                return json.loads(res)
+    
+    async def post_items(name,postdata):
+        # logger.warning(postdata)
+        url="http://localhost:8000/"+name
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=postdata, headers={"Content-Type": 'application/json','User-Agent': "TelegramPlugin"}) as response:
+                return await response.text()
+    
+    @events.register(events.NewMessage(pattern=r".*°(C|F)$"))
+    async def inputTemp(event):
+        kettles = await TelegramCallbacks.get_items("kettle")
+        fermenter = await TelegramCallbacks.get_items("fermenter")
+        TEMP_UNIT = await TelegramCallbacks.post_items("config/TEMP_UNIT/","")
+        TEMP_UNIT = TEMP_UNIT[1:-1]
+        # TEMP_UNIT=self.cbpi.config.get("TEMP_UNIT", "C")
+        # kettles = self.cbpi.kettle.get_state()
+        # fermenter = self.cbpi.fermenter.get_state()
+        match = re.match(r'^(([+-])?[0-9]+(\.[0-9])?°(C|F))', event.raw_text)
+        msg = await event.client.get_messages(event.chat, ids=int(event.message.id)-1)
+        if match is not None:
+            number = match.group(1)
+            if 'F' in TEMP_UNIT:
+                temp = round(9.0 / 5.0 * float(number[:-2]) + 32, 2)
+            else:
+                temp = float(number[:-2])
+            for item in fermenter["data"]:
+                if item["name"] in msg.message:
+                    await TelegramCallbacks.post_items("fermenter/"+item["id"]+"/target_temp",json.dumps( {"temp": temp}))
+                    await event.respond("Set Target_temp of {} to {}°{}.".format(item["name"],temp,TEMP_UNIT))
+            for item in kettles["data"]:
+                if item["name"] in msg.message:
+                    await TelegramCallbacks.post_items("kettle/"+item["id"]+"/target_temp",json.dumps( {"temp": temp}))
+                    await event.respond("Set Target_temp of {} to {}°{}.".format(item["name"],temp,TEMP_UNIT))
+                    # await self.set_target_temp(item["id"],temp)
+        else:
+            await event.respond("**No valid Input for Set Target_temp of {} found!**(Please use Format +-XXX°C or +-XXX°F)".format("STEP ABC"))
+        raise events.StopPropagation
+
     @events.register(events.NewMessage)
     async def new_message_handler(event):
-        bot = event.client
-        sender = await event.get_sender()
-        logger.warning(sender)
-        chat_id = event.chat_id
-        messages = await sender.get_messages(int(chat_id),limit=2)
-        for message in messages:
-            if "new target temperature" in message:
-                temp = '999'
-                unit = "°C"
-                match = re.match(r'^(?=(.|,))([+-]?([0-9]*)(\(.|,)([0-9]+))?)$', event.raw_text)
-                number = match.group(1)
-                if number is not None:
-                    if 'F' in self.cbpi.config.get("TEMP_UNIT", "C"):
-                        unit = "°F"
-                        temp = round(9.0 / 5.0 * float(number) + 32, 2)
-                    else:
-                        temp = float(number)
-                    # await self.controller.set_target_temp(id,temp)
-                    for item in fermenter:
-                        if item["name"] in message:
-                            await self.set_fermenter_target_temp(item["id"],temp)
-                            await event.respond("Set Target_temp of {} to {}{}.".format(item["name"],temp,unit))
-                    for item in kettles:
-                        if item["id"] in message:
-                            await self.set_target_temp(item["id"],temp)
-                            await event.respond("Set Target_temp of {} to {}{}.".format(item["name"],temp,unit))
-                else:
-                    await event.respond("**No valid Input for Set Target_temp of {} found!**".format(item["name"]))
-
-            if "original gravity" in message:
-                match = re.match(r'^(?=(.|,))([+-]?([0-9]*)(\(.|,)([0-9]+))?)$', event.raw_text)
-                number = match.group(1)
-                if number is not None:
-                    await self.controller.next()
-                else:
-                    await event.respond("**No valid Input for measure of original gravity found!**")
-
-        if r'(?i).*moin' or r'(?i).*hi' or r'(?i).*h(a|e)llo' in event.raw_text:
+        # if event.is_reply:
+            # replied = await event.get_reply_message()
+            # sender = replied.sender
+            # logger.warning(replied)
+            # logger.warning(sender)
+        if re.search(r"(?i)moin", event.raw_text) or re.search(r"(?i)h(e|a)llo", event.raw_text) or re.search(r"(?i)hi", event.raw_text):
             sender = await event.get_sender()
-            await event.respond("Hi {}, use command /help to find a list of all commands.".format(sender))
+            await event.respond("Hi {}, use command /help to find a list of all commands.".format(sender.first_name))
         else:
             sender = await event.get_sender()
-            await event.respond("Hi {}, I could not parse your text.".format(sender))
+            await event.respond("Hi {}, I could not parse your text.".format(sender.first_name))
