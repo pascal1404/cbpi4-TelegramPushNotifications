@@ -1,6 +1,7 @@
 
 # -*- coding: utf-8 -*-
 import os
+import aiohttp
 from aiohttp import web
 import logging
 from unittest.mock import MagicMock, patch
@@ -8,6 +9,7 @@ import asyncio
 from telethon import *
 import re
 import random
+import json
 import cbpi
 from .callbacks import TelegramCallbacks
 from cbpi.api import *
@@ -33,29 +35,32 @@ class Telegram(CBPiExtension):
     def __init__(self,cbpi):
         self.cbpi = cbpi
         self.controller : StepController = cbpi.step
-        self.cbpi.register(self, "/step2")
         self.cbpi.bus.register_object(self)
         self._task = asyncio.create_task(self.run())
         
 
-    # async def set_commands(self):
-        # cmd_list = [
-        # {"command":"help","description":"get a list of all commands with description"},
-        # {"command":"next","description":"Next Brew Step"},
-        # {"command":"start","description":"start brewing"},
-        # {"command":"stop","description":"stop brewing"},
-        # {"command":"set_target","description":"set Target Temperature of the item you choose"},
-        # {"command":"get_target","description":"get Target Temperature of all items"},
-        # {"command":"get_timer","description":"get the actual countdown time"},
-        # {"command":"get_chart","description":"send Picture of chart from the item you choose"},
-        # {"command":"get_parameter","description":"get all parameters of the item you choose"}]
-        # if telegram_bot_token is not None and telegram_chat_id is not None:
-            # url = "https://api.telegram.org/bot" + telegram_bot_token + "/setMyCommands"
-            # escapedUrl = requests.Request('GET', url,
-                                        # params={"chat_id": telegram_chat_id,
-                                                # "commands": json.dumps(cmd_list)}
-                                        # ).prepare().url
-            # requests.get(escapedUrl)
+    async def set_commands(self):
+        cmd_list = [
+        {"command":"help","description":"get a list of all commands with description"},
+        {"command":"next","description":"Next Brew Step"},
+        {"command":"start","description":"start brewing"},
+        {"command":"stop","description":"stop brewing"},
+        {"command":"reset","description":"reset brewing"},
+        {"command":"set_target","description":"set Target Temperature of the item you choose"},
+        {"command":"get_target","description":"get Target Temperature of all items"},
+        {"command":"get_step_info","description":"get infos of the active step"},
+        {"command":"get_chart","description":"send Picture of chart from the item you choose"},
+        {"command":"get_parameter","description":"get all parameters of the item you choose"}]
+        
+        if telegram_bot_token is not None and telegram_chat_id is not None:
+            url = "https://api.telegram.org/bot" + telegram_bot_token + "/setMyCommands"
+            params={"chat_id": telegram_chat_id, "commands": json.dumps(cmd_list)}
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    res = await response.text()
+                    logger.info(res)
+                    return json.loads(res)
                 
     async def run(self):
         global bot
@@ -75,57 +80,9 @@ class Telegram(CBPiExtension):
         else:
             self.listener_ID = self.cbpi.notification.add_listener(self.messageEvent)
             logger.info("Telegram Bot Listener ID: {}".format(self.listener_ID))
-            ############################## Nur zum Testen wie ich an die Daten komme
-            # kettles = self.cbpi.kettle.get_state()
-            # fermenter = self.cbpi.fermenter.get_state()
-            # actors = self.cbpi.actor.get_state()
-            # sensors = self.cbpi.sensor.get_state()
-            # logger.warning(kettles)
-            # logger.info(" ")
-            # await self.controller.start()
-            # logger.warning(fermenter)
-            # logger.info(" ")
-            # logger.warning(actors)
-            # logger.info(" ")
-            # logger.warning(sensors)
-            # logger.info(" ")
-            steps = self.cbpi.step.get_state()
-            for value in steps["steps"]:
-                step = self.cbpi.step.find_by_id(value["id"])
-                logger.warning("{}".format(value))
-                logger.warning("{}".format(step.instance.summary))
-                logger.warning("{}".format(value["state_text"]))
-            # buttons = []
-            # for value in kettles["data"]:
-                # logger.info(value["name"])
-                # logger.warning(self.cbpi.sensor.get_sensor_value(value["id"])["value"])
-                # buttons.append(Button.inline(value["name"],value["id"]))
-            # for value in fermenter["data"]:
-                # logger.info(value["name"])
-                # buttons.append(Button.inline(value["name"],value["id"]))
-
-            # await self.controller.stop()
-            # steps = self.cbpi.step.get_state()
-            # for value in steps["steps"]:
-                # logger.warning("{}: {}".format(value["name"],value["status"]))
-                
-            # await self.controller.next()
-            # steps = self.cbpi.step.get_state()
-            # for value in steps["steps"]:
-                # logger.warning("{}: {}".format(value["name"],value["status"]))
-                
-            # await self.controller.stop()
-            # steps = self.cbpi.step.get_state()
-            # for value in steps["steps"]:
-                # logger.warning("{}: {}".format(value["name"],value["status"]))
-                
-                
-            # await self.controller.start()
-            # steps = self.cbpi.step.get_state()
-            # for value in steps["steps"]:
-                # logger.warning("{}: {}".format(value["name"],value["status"]))
-                
-            ######################################################## ende Testdaten
+            
+            await self.set_commands()
+            
             bot = await TelegramClient('bot', int(telegram_api_id), telegram_api_hash).start(bot_token=telegram_bot_token)
             bot.add_event_handler(callbacks.TelegramCallbacks.callbackQuery)
             bot.add_event_handler(callbacks.TelegramCallbacks.help)
@@ -135,11 +92,13 @@ class Telegram(CBPiExtension):
             bot.add_event_handler(callbacks.TelegramCallbacks.reset)
             bot.add_event_handler(callbacks.TelegramCallbacks.setTarget)
             bot.add_event_handler(callbacks.TelegramCallbacks.getTarget)
-            bot.add_event_handler(callbacks.TelegramCallbacks.getTimer)
+            bot.add_event_handler(callbacks.TelegramCallbacks.getStepInfo)
+            bot.add_event_handler(callbacks.TelegramCallbacks.getChart)
+            bot.add_event_handler(callbacks.TelegramCallbacks.getParams)
             bot.add_event_handler(callbacks.TelegramCallbacks.gravity)
             bot.add_event_handler(callbacks.TelegramCallbacks.inputTemp)
             bot.add_event_handler(callbacks.TelegramCallbacks.new_message_handler)
-            logger.warning("ende")
+            logger.info("TelegramPushNotifications: all event_handler added!")
 
     async def telegramBotToken(self):
         global telegram_bot_token

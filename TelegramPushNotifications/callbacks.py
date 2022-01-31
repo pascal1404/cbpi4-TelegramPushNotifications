@@ -33,8 +33,8 @@ class TelegramCallbacks(CBPiExtension):
         msg = await event.get_message()
         TEMP_UNIT = await TelegramCallbacks.post_items("config/TEMP_UNIT/","")
         TEMP_UNIT = TEMP_UNIT[1:-1]
-        kettles = await TelegramCallbacks.get_items("kettle")
-        fermenter = await TelegramCallbacks.get_items("fermenter")
+        kettles = await TelegramCallbacks.get_items("kettle/")
+        fermenter = await TelegramCallbacks.get_items("fermenter/")
         if "get_target_temp" in msg.message:
             for item in fermenter["data"]:
                 if item["id"] in str(event.data):
@@ -49,6 +49,44 @@ class TelegramCallbacks(CBPiExtension):
             for item in kettles["data"]:
                 if item["id"] in str(event.data):
                     await event.edit("Enter the new target temperature for {}:".format(item["name"]))
+        elif "get_parameter" in msg.message:
+            for item in fermenter["data"]:
+                if item["id"] in str(event.data):
+                    heater = ""
+                    cooler = ""
+                    # actors = self.cbpi.actor.get_state()
+                    # sensors = self.cbpi.sensor.get_state()
+                    sensor = await TelegramCallbacks.get_items("sensor/"+item["sensor"])
+                    actor = await TelegramCallbacks.get_items("actor/")
+                    for act in actor["data"]:
+                        if act["id"] in item["heater"]:
+                            heater = act["state"]
+                        if act["id"] in item["cooler"]:
+                            cooler = act["state"]
+                    await event.edit("**{}**:\nbrewname: {}\nTarget-Temp: {}°{}\nSensor-Temp: {}°{}\nAutomatic: {}\nHeater: {}\nCooler: {}".format(item["name"],
+                    item["brewname"],item["target_temp"],TEMP_UNIT,sensor["value"],TEMP_UNIT,item["state"],heater,cooler))
+            for item in kettles["data"]:
+                if item["id"] in str(event.data):
+                    heater = ""
+                    heater_power = ""
+                    agitator = ""
+                    sensor = await TelegramCallbacks.get_items("sensor/"+item["sensor"])
+                    actor = await TelegramCallbacks.get_items("actor/")
+                    for act in actor["data"]:
+                        if act["id"] in item["heater"]:
+                            heater = act["state"]
+                            heater_power = act["power"]
+                        if act["id"] in item["agitator"]:
+                            agitator = act["state"]
+                    await event.edit("**{}**:\nTarget-Temp: {}°{}\nSensor-Temp: {}°{}\nAutomatic: {}\nHeater: {}\nPower: {}%\nAgitator: {}".format(item["name"],
+                    item["target_temp"],TEMP_UNIT,sensor["value"],TEMP_UNIT,item["state"],heater,heater_power,agitator))
+        elif "get_chart" in msg.message:
+            for item in fermenter["data"]:
+                if item["id"] in str(event.data):
+                    await event.edit("Charts are not implemented, yet! But will probably need influxdb and grafana.")
+            for item in kettles["data"]:
+                if item["id"] in str(event.data):
+                    await event.edit("Charts are not implemented, yet! But will probably need influxdb and grafana.")
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/next'))
@@ -66,9 +104,10 @@ class TelegramCallbacks(CBPiExtension):
                     {"command":"next","description":"Next Brew Step"},
                     {"command":"start","description":"start brewing"},
                     {"command":"stop","description":"stop brewing"},
+                    {"command":"reset","description":"reset brewing"},
                     {"command":"set_target","description":"set Target Temperature of the item you choose"},
                     {"command":"get_target","description":"get Target Temperature of all items"},
-                    {"command":"get_timer","description":"get the actual countdown time"},
+                    {"command":"get_step_info","description":"get infos of the active step"},
                     {"command":"get_chart","description":"send Picture of chart from the item you choose"},
                     {"command":"get_parameter","description":"get all parameters of the item you choose"}]
         for items in cmd_list:
@@ -97,37 +136,42 @@ class TelegramCallbacks(CBPiExtension):
     
     @events.register(events.NewMessage(pattern='/set_target'))
     async def setTarget(event):
-        buttons = []
-        kettles = await TelegramCallbacks.get_items("kettle")
-        fermenter = await TelegramCallbacks.get_items("fermenter")
-        for value in kettles["data"]:
-            buttons.append(Button.inline(value["name"],value["id"]))
-        for value in fermenter["data"]:
-            buttons.append(Button.inline(value["name"],value["id"]))
+        buttons = await TelegramCallbacks.gen_buttons()
         await event.respond("**Choose Item for set_target_temp**",buttons=buttons)
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/get_target'))
     async def getTarget(event):
-        buttons = []
-        kettles = await TelegramCallbacks.get_items("kettle")
-        fermenter = await TelegramCallbacks.get_items("fermenter")
-        for value in kettles["data"]:
-            buttons.append(Button.inline(value["name"],value["id"]))
-        for value in fermenter["data"]:
-            buttons.append(Button.inline(value["name"],value["id"]))
+        buttons = await TelegramCallbacks.gen_buttons()
         await event.respond("**Choose Item for get_target_temp**",buttons=buttons)
         raise events.StopPropagation
     
-    @events.register(events.NewMessage(pattern='/get_timer'))
-    async def getTimer(event):
+    @events.register(events.NewMessage(pattern='/get_step_info'))
+    async def getStepInfo(event):
         # steps = self.cbpi.step.get_state()
-        steps = await TelegramCallbacks.get_items("step2")
-        logger.info(steps)
+        steps = await TelegramCallbacks.get_items("step2/")
         for value in steps["steps"]:
             if value["status"] == "A":
-                await event.respond("timer of step '{}' is {}.".format(value["name"],value["state_text"]))
-            logger.warning("{}: {}".format(value["name"],value["status"]))
+                if value["state_text"] is not "":
+                    await event.respond("Additional information of active step '{}' is {}.".format(value["name"],value["state_text"]))
+                else:
+                    await event.respond("No additional information for active step '{}'".format(value["name"]))
+            elif value["status"] == "P":
+                await event.respond("Step '{}' is paused.".format(value["name"]))
+            else:
+                await event.respond("No active step.")
+        raise events.StopPropagation
+    
+    @events.register(events.NewMessage(pattern='/get_chart'))
+    async def getChart(event):
+        buttons = await TelegramCallbacks.gen_buttons()
+        await event.respond("**Choose Item for get_chart**",buttons=buttons)
+        raise events.StopPropagation
+    
+    @events.register(events.NewMessage(pattern='/get_parameter'))
+    async def getParams(event):
+        buttons = await TelegramCallbacks.gen_buttons()
+        await event.respond("**Choose Item for get_parameter**",buttons=buttons)
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern=r".*(°P|Brix).*"))
@@ -141,10 +185,20 @@ class TelegramCallbacks(CBPiExtension):
         else:
             await event.respond("**No valid Input for original gravity found!**(Please use Format XX.X°P or XX.X Brix)")
         raise events.StopPropagation
+        
+    async def gen_buttons():
+        buttons = []
+        kettles = await TelegramCallbacks.get_items("kettle/")
+        fermenter = await TelegramCallbacks.get_items("fermenter/")
+        for value in kettles["data"]:
+            buttons.append(Button.inline(value["name"],value["id"]))
+        for value in fermenter["data"]:
+            buttons.append(Button.inline(value["name"],value["id"]))
+        return buttons
     
     async def get_items(name):
         res = " "
-        url="http://127.0.0.1:8000/"+name+"/"
+        url="http://127.0.0.1:8000/"+name
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 res = await response.text()
@@ -160,8 +214,8 @@ class TelegramCallbacks(CBPiExtension):
     
     @events.register(events.NewMessage(pattern=r".*°(C|F)$"))
     async def inputTemp(event):
-        kettles = await TelegramCallbacks.get_items("kettle")
-        fermenter = await TelegramCallbacks.get_items("fermenter")
+        kettles = await TelegramCallbacks.get_items("kettle/")
+        fermenter = await TelegramCallbacks.get_items("fermenter/")
         TEMP_UNIT = await TelegramCallbacks.post_items("config/TEMP_UNIT/","")
         TEMP_UNIT = TEMP_UNIT[1:-1]
         # TEMP_UNIT=self.cbpi.config.get("TEMP_UNIT", "C")
