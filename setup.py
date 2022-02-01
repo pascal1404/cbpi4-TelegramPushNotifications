@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='TelegramPushNotifications',
-      version='0.1.2',
+      version='0.1.3',
       description='Plugin to send CraftBeerPi Notifications to a Telegram-Chat',
       author='Pascal Scholz',
       author_email='pascal1404@gmx.de',

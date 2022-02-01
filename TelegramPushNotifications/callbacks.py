@@ -41,7 +41,7 @@ class TelegramCallbacks(CBPiExtension):
                     await event.edit("Target_temp of {} is {}°{}.".format(item["name"],item["target_temp"],TEMP_UNIT))
             for item in kettles["data"]:
                 if item["id"] in str(event.data):
-                    await event.edit("Target_temp of {} {}°{}.".format(item["name"],item["target_temp"],TEMP_UNIT))
+                    await event.edit("Target_temp of {} is {}°{}.".format(item["name"],item["target_temp"],TEMP_UNIT))
         elif "set_target_temp" in msg.message:
             for item in fermenter["data"]:
                 if item["id"] in str(event.data):
@@ -93,6 +93,7 @@ class TelegramCallbacks(CBPiExtension):
     async def next(event):
         # await self.controller.next()
         await TelegramCallbacks.post_items("step2/next","")
+        await event.respond("Next step started!")
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/help'))
@@ -119,18 +120,57 @@ class TelegramCallbacks(CBPiExtension):
     @events.register(events.NewMessage(pattern='/start'))
     async def start(event):
         # await self.controller.start()
+        steps = await TelegramCallbacks.get_items("step2/")
+        found_paused_step = False
+        found_active_step = False
+        
+        for value in steps["steps"]:
+            if value["status"] == "P":
+                found_paused_step = True
+                await event.respond("Step '{}' resumed.".format(value["name"]))
+            elif value["status"] == "A":
+                found_active_step = True
+                await event.respond("Step '{}' is already started.".format(value["name"]))
+        if not found_paused_step and not found_active_step:
+            await event.respond("brewing started!")
         await TelegramCallbacks.post_items("step2/start","")
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/stop'))
     async def stop(event):
         # await self.controller.stop()
+        steps = await TelegramCallbacks.get_items("step2/")
+        found_paused_step = False
+        found_active_step = False
+        
+        for value in steps["steps"]:
+            if value["status"] == "P":
+                found_paused_step = True
+                await event.respond("Step '{}' is already stopped.".format(value["name"]))
+            elif value["status"] == "A":
+                found_active_step = True
+                await event.respond("Step '{}' stopped.".format(value["name"]))
+        if not found_paused_step and not found_active_step:
+            await event.respond("brewing is not active!")
         await TelegramCallbacks.post_items("step2/stop","")
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/reset'))
     async def reset(event):
         # await self.controller.reset()
+        steps = await TelegramCallbacks.get_items("step2/")
+        found_paused_step = False
+        found_active_step = False
+        
+        for value in steps["steps"]:
+            if value["status"] == "P":
+                found_paused_step = True
+                await event.respond("brewing stopped!")
+            elif value["status"] == "A":
+                found_active_step = True
+                await event.respond("Step '{}' need to be stopped before.".format(value["name"]))
+        if not found_paused_step and not found_active_step:
+            await event.respond("brewing is not active!")
         await TelegramCallbacks.post_items("step2/reset","")
         raise events.StopPropagation
     
@@ -150,16 +190,20 @@ class TelegramCallbacks(CBPiExtension):
     async def getStepInfo(event):
         # steps = self.cbpi.step.get_state()
         steps = await TelegramCallbacks.get_items("step2/")
+        found_active_step = False
+        
         for value in steps["steps"]:
             if value["status"] == "A":
+                found_active_step = True
                 if value["state_text"] is not "":
                     await event.respond("Additional information of active step '{}' is {}.".format(value["name"],value["state_text"]))
                 else:
                     await event.respond("No additional information for active step '{}'".format(value["name"]))
             elif value["status"] == "P":
+                found_active_step = True
                 await event.respond("Step '{}' is paused.".format(value["name"]))
-            else:
-                await event.respond("No active step.")
+        if not found_active_step:
+            await event.respond("No active step.")
         raise events.StopPropagation
     
     @events.register(events.NewMessage(pattern='/get_chart'))
@@ -182,6 +226,7 @@ class TelegramCallbacks(CBPiExtension):
             logger.info(gravity)
             # await self.controller.next()
             await TelegramCallbacks.post_items("step2/next","")
+            await event.respond("Next step started!")
         else:
             await event.respond("**No valid Input for original gravity found!**(Please use Format XX.X°P or XX.X Brix)")
         raise events.StopPropagation
