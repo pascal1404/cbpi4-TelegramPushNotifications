@@ -4,9 +4,9 @@ Telegram Push Notifications for Craftbeerpi 4
 This Plugin allows you to interact with your craftbeerpi 4 instance.
 
 Plugin Install:
-1. run ´pip install https://github.com/pascal1404/cbpi4-TelegramPushNotifications/archive/refs/heads/main.zip´
-2. change directory to path where your local config-folder is. like ´cd /home/pi/craftbeerpi´
-3. run `cbpi add TelegramPushNotifications´
+1. run `pip install https://github.com/pascal1404/cbpi4-TelegramPushNotifications/archive/refs/heads/main.zip`
+2. change directory to path where your local config-folder is. like `cd /home/pi/craftbeerpi`
+3. run `cbpi add TelegramPushNotifications`
 4. start your craftbeer 4 with ´cbpi start´
 
 Setup:
@@ -25,11 +25,13 @@ Setup:
 5. Login to your Telegram account (https://my.telegram.org) with the phone number of your telegram account to use.
 6. Click under API Development tools.
 7. A Create new application window will appear. Fill in your application details. There is no need to enter any URL, and only the first two fields (App title and Short name) can currently be changed later.
-8. Click on Create application at the end. ==Remember that your API hash is secret and Telegram won’t let you revoke it. Don’t post it anywhere!==
+8. Click on Create application at the end. 
+| :warning: Remember that your API hash is secret and Telegram won’t let you revoke it. Don’t post it anywhere! |
+|------|
 9. Input your Bot token, Chat ID, API ID and API HASH you acquired in previous steps into the Craftbeerpi parameters page (may require a system reboot if parameters not visible).
 10. Reboot your system.
 11. Everything should now be pushed to your Telegram.
 
 ToDo:
-[] send chart of Kettle or Fermenter as picture
-[] exit Notifications-Popups e.g. Autostart of Mashstep is off -> get to next Step from telegram
+- [ ] send chart of Kettle or Fermenter as picture
+- [ ] exit Notifications-Popups e.g. Autostart of Mashstep is off -> get to next Step from telegram
