@@ -26,8 +26,8 @@ Setup:
 6. Click under API Development tools.
 7. A Create new application window will appear. Fill in your application details. There is no need to enter any URL, and only the first two fields (App title and Short name) can currently be changed later.
 8. Click on Create application at the end. 
-| :warning: Remember that your API hash is secret and Telegram won’t let you revoke it. Don’t post it anywhere! |
-|------|
+> :warning: **_Attention:_** Remember that your API hash is secret and Telegram won’t let you revoke it. Don’t post it anywhere!
+
 9. Input your Bot token, Chat ID, API ID and API HASH you acquired in previous steps into the Craftbeerpi parameters page (may require a system reboot if parameters not visible).
 10. Reboot your system.
 11. Everything should now be pushed to your Telegram.
