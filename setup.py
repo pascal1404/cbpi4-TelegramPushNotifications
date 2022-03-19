@@ -1,6 +1,6 @@
 from setuptools import setup
 
-setup(name='TelegramPushNotifications',
+setup(name='cbpi4-TelegramPushNotifications',
       version='0.1.3',
       description='Plugin to send CraftBeerPi Notifications to a Telegram-Chat',
       author='Pascal Scholz',
@@ -10,8 +10,8 @@ setup(name='TelegramPushNotifications',
       package_data={
         # If any package contains *.txt or *.rst files, include them:
       '': ['*.txt', '*.rst', '*.yaml'],
-      'TelegramPushNotifications': ['*','*.txt', '*.rst', '*.yaml']},
-      packages=['TelegramPushNotifications'],
+      'cbpi4-TelegramPushNotifications': ['*','*.txt', '*.rst', '*.yaml']},
+      packages=['cbpi4-TelegramPushNotifications'],
       install_requires=[
             'telethon',
       ],
