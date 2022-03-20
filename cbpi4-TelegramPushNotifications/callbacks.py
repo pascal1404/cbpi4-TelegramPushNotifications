@@ -11,6 +11,11 @@ import re
 import random
 import json
 import cbpi
+import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
+from influxdb_client import InfluxDBClient
+from datetime import datetime
 from cbpi.api import *
 from cbpi.api.config import ConfigType
 from cbpi.api.base import CBPiBase
@@ -83,12 +88,18 @@ class TelegramCallbacks(CBPiExtension):
         elif "get_chart" in msg.message:
             for item in fermenter["data"]:
                 if item["id"] in str(event.data):
-                    await event.edit("Charts are not implemented, yet! But will probably need influxdb and grafana.")
+                    async with event.client.action(event.chat_id, 'photo') as action:
+                        await TelegramCallbacks.gen_chart(item["id"])
+                        await event.edit("Fermenter: {}".format(item["name"]))
+                        await event.client.send_file(event.chat_id, file='./config/upload/fig1.png', progress_callback=action.progress)
             for item in kettles["data"]:
                 if item["id"] in str(event.data):
-                    await event.edit("Charts are not implemented, yet! But will probably need influxdb and grafana.")
+                    async with event.client.action(event.chat_id, 'photo') as action:
+                        await TelegramCallbacks.gen_chart(item["id"])
+                        await event.edit("Kettle: {}".format(item["name"]))
+                        await event.client.send_file(event.chat_id, file='./config/upload/fig1.png', progress_callback=action.progress)
         raise events.StopPropagation
-    
+
     @events.register(events.NewMessage(pattern='/next'))
     async def next(event):
         # await self.controller.next()
@@ -300,3 +311,136 @@ class TelegramCallbacks(CBPiExtension):
         else:
             sender = await event.get_sender()
             await event.respond("Hi {}, I could not parse your text.".format(sender.first_name))
+
+    async def gen_chart(id):
+        # sendChatAction("upload_photo")
+        
+        influxdbcloud = await TelegramCallbacks.post_items("config/INFLUXDBCLOUD","")
+        influxdbcloud=influxdbcloud[1:-1]
+        influxdbaddr = await TelegramCallbacks.post_items("config/INFLUXDBADDR","")
+        influxdbaddr=influxdbaddr[1:-1]
+        influxdbport = await TelegramCallbacks.post_items("config/INFLUXDBPORT","")
+        influxdbport=influxdbport[1:-1]
+        influxdbname = await TelegramCallbacks.post_items("config/INFLUXDBNAME","")
+        influxdbname=influxdbname[1:-1]
+        influxdbuser = await TelegramCallbacks.post_items("config/INFLUXDBUSER","")
+        influxdbuser=influxdbuser[1:-1]
+        influxdbpwd = await TelegramCallbacks.post_items("config/INFLUXDBPWD","")
+        influxdbpwd=influxdbpwd[1:-1]
+        
+        if influxdbcloud != "No":
+            if influxdbaddr is not None or influxdbuser is not None or influxdbname is not None or influxdbpwd is not None:
+                sensors=[]
+                TEMP_UNIT = await TelegramCallbacks.post_items("config/TEMP_UNIT/","")
+                TEMP_UNIT = TEMP_UNIT[1:-1]
+                kettles = await TelegramCallbacks.get_items("kettle/")
+                ket=None
+                for item in kettles["data"]:
+                    if item["id"] == id:
+                        ket = item
+                        break
+                fermenter = await TelegramCallbacks.get_items("fermenter/")
+                ferm=None
+                for item in fermenter["data"]:
+                    if item["id"] == id:
+                        ferm = item
+                        break
+                sensor = await TelegramCallbacks.get_items("sensor/")
+                for value in sensor["data"]:
+                    if ket is not None:
+                        if value["id"] == ket["sensor"]:
+                            sensors.append(dict(name=value["name"],type="Act Temp",id=value["id"]))
+                        elif value["type"] == "KettleSensor":
+                            if value["props"]["Kettle"] == id:
+                                if value["props"]["Data"] == "TargetTemp":
+                                    sensors.append(dict(name=value["name"],type="Target Temp",id=value["id"]))
+                                else:
+                                    sensors.append(dict(name=value["name"],type="Power",id=value["id"]))
+                    elif ferm is not None:
+                        if value["id"] == ferm["sensor"]:
+                            sensors.append(dict(name=value["name"],type="Act Temp",id=value["id"]))
+                        elif value["type"] == "FermenterSensor":
+                            if value["props"]["Fermenter"] == id:
+                                if value["props"]["Data"] == "TargetTemp":
+                                    sensors.append(dict(name=value["name"],type="Target Temp",id=value["id"]))
+                                else:
+                                    sensors.append(dict(name=value["name"],type="Power",id=value["id"]))
+
+                client = InfluxDBClient(url="https://"+influxdbaddr, token=influxdbpwd, org=influxdbuser)
+                query_api = client.query_api()
+                results = []
+                for sensor in sensors:
+                    # logger.warning(sensor)
+                    query = f'from(bucket: "{influxdbname}") |> range(start: -8h) |> filter(fn: (r) => r["itemID"] == "{sensor["id"]}")'
+                    result = client.query_api().query(org=influxdbuser, query=query)
+
+                    sensor = []
+                    for table in result:
+                        for record in table.records:
+                            sensor.append([record.get_time(), record.get_value()])
+                    
+                    results.append(sensor)
+
+                fig = plt.figure()
+                ax = fig.add_subplot(1,1,1)
+                hfmt = matplotlib.dates.DateFormatter('%H:%M:%S')
+
+                ax.xaxis.set_major_formatter(hfmt)
+                if ket is not None:
+                    ax.set_title('Kettle: %s' % ket["name"])
+                if ferm is not None:
+                    ax.set_title('Fermenter: %s' % ferm["name"])
+                ax.set_xlabel('Time')
+                ax.set_ylabel('Temperature in °'+TEMP_UNIT)
+                ax.set_ylim(-10, 110)
+                plt.setp(ax.get_xticklabels(), size=8)
+
+                ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
+                ax2.set_ylabel('Power in %')
+                ax2.set_ylim(0, 100)
+                lns = None
+                for i, result in enumerate(results):
+                    x = [d[0] for d in result]
+                    xs = matplotlib.dates.date2num(x)
+                    y = [val[1] for val in result]
+                    if sensors[i]["type"] == "Power":
+                        ln = ax2.plot(xs, y, color='g', label=sensors[i]["type"])
+                    elif sensors[i]["type"] == "Target Temp":
+                        ln = ax.plot(xs, y, color='r', label=sensors[i]["type"])
+                    elif sensors[i]["type"] == "Act Temp":
+                        ln = ax.plot(xs, y, color='b', label=sensors[i]["type"])
+                    else:
+                        ln = ax.plot(xs, y, label=sensors[i]["type"])
+                    if i == 0:
+                        lns = ln
+                    else:
+                        lns += ln
+
+                plt.grid()
+                labs = [l.get_label() for l in lns]
+                ax.legend(lns, labs, loc=0)
+                fig.tight_layout()
+                fig.savefig('./config/upload/fig1.png')
+                plt.close(fig)
+        
+        # line1 = pd.read_csv('./logs/sensor_%s.log' % item.sensor, header=None, usecols=[0,1])
+        # y1 = line1[1]
+
+        # if switch == "K":
+            # line2 = pd.read_csv('./logs/kettle_%s.log' % item.id, header=None, usecols=[0,1])
+            # x2 = [datetime.strptime(d, '%Y-%m-%d %H:%M:%S') for d in line2[0]]
+            # y2 = line2[1]
+
+            # line3 = pd.read_csv('./logs/action.log', header=None, usecols=[0,1])
+            # x3 = [datetime.strptime(d, '%Y-%m-%d %H:%M:%S') for d in line3[0]]
+            # y3 = line3[1]
+            # xs3 = matplotlib.dates.date2num(x3)
+           # # Add labels to the plot
+            # style = dict(size=8, color='black', ha='right', va='top', rotation=90)
+            # for index, row in line3.iterrows():
+                # ax.text(xs3[index], 108, row[1][13:-1], **style)
+                # ax.plot([xs3[index],xs3[index]],[0,110], color='r')
+        # elif switch == "F":
+            # line2 = pd.read_csv('./logs/fermenter_%s.log' % item.id, header=None, usecols=[0,1])
+            # x2 = [datetime.strptime(d, '%Y-%m-%d %H:%M:%S') for d in line2[0]]
+            # y2 = line2[1]

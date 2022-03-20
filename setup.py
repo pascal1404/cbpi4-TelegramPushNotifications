@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='cbpi4-TelegramPushNotifications',
-      version='0.1.3',
+      version='0.1.4',
       description='Plugin to send CraftBeerPi Notifications to a Telegram-Chat',
       author='Pascal Scholz',
       author_email='pascal1404@gmx.de',
@@ -14,5 +14,9 @@ setup(name='cbpi4-TelegramPushNotifications',
       packages=['cbpi4-TelegramPushNotifications'],
       install_requires=[
             'telethon',
+            'influxdb-client',
+            'matplotlib',
+            'pandas',
+            'cryptg',
       ],
      )

@@ -130,16 +130,6 @@ class Telegram(CBPiExtension):
             except:
                 logger.warning('Unable to update config')
 
-    async def telegramBotToken(self):
-        global telegram_bot_token
-        telegram_bot_token = self.cbpi.config.get("telegram_bot_token", None)
-        if telegram_bot_token is None:
-            logger.info("INIT Telegram Bot Token")
-            try:
-                await self.cbpi.config.add("telegram_bot_token", "", ConfigType.STRING, "Telegram Bot Token")
-            except:
-                logger.warning('Unable to update config')
-
     async def telegramChatId(self):
         global telegram_chat_id
         telegram_chat_id = self.cbpi.config.get("telegram_chat_id", None)

@@ -33,5 +33,5 @@ Setup:
 11. Everything should now be pushed to your Telegram.
 
 ToDo:
-- [ ] send chart of Kettle or Fermenter as picture
+- [ ] send chart of Kettle or Fermenter as picture works for Influxdb-Cloud should be added to influxdb v1.x and logfiles
 - [ ] exit Notifications-Popups e.g. Autostart of Mashstep is off -> get to next Step from telegram
