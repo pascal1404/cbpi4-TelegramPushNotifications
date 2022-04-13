@@ -37,6 +37,7 @@ class Telegram(CBPiExtension):
         self.controller : StepController = cbpi.step
         self.cbpi.bus.register_object(self)
         self._task = asyncio.create_task(self.run())
+        self.msg_last = None
         
 
     async def set_commands(self):
@@ -142,7 +143,26 @@ class Telegram(CBPiExtension):
 
     async def messageEvent(self, cbpi, title, message, type, action):
         if telegram_bot_token is not None and telegram_chat_id is not None:
-            await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message))
+            id = None
+            actions=list(map(lambda item: item.to_dict(), action))
+
+            for key in self.cbpi.notification.callback_cache:
+                if self.cbpi.notification.callback_cache[key] == action:
+                    id = key
+            buttons = []
+            for act in actions:
+                buttons.append(Button.inline(act["label"],{"n": id, "a": act["id"]}))
+
+            if title == "Fly sparging" and "sparging water:" in message:
+                if "1 " in message:
+                    self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message),buttons=buttons)
+                else:
+                    await bot.edit_message(int(telegram_chat_id), self.msg_last, "**{}**\n__{}__".format(title,message),buttons=buttons)
+            else:
+                if buttons:
+                    self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message),buttons=buttons)
+                else:
+                    self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message))
 
 def setup(cbpi):
     cbpi.plugin.register("TelegramPushNotifications", Telegram)

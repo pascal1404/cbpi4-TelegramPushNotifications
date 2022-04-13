@@ -32,6 +32,10 @@ Setup:
 10. Reboot your system.
 11. Everything should now be pushed to your Telegram.
 
+In you Telegram-chat you have a menu with commands you can use. 
+Notifications will be forwarded to Telegram.
+Notifications with actions like MashIn-step-notification will get the text of the notification and the buttons. You can use the buttons in Telegram or in the dashboard, both works the same.
+
 ToDo:
-- [ ] send chart of Kettle or Fermenter as picture works for Influxdb-Cloud should be added to influxdb v1.x and logfiles
-- [ ] exit Notifications-Popups e.g. Autostart of Mashstep is off -> get to next Step from telegram
+- [ ] send chart of Kettle or Fermenter as picture works for Influxdb-Cloud and CSV-logfiles should be added to influxdb v1.x
+- [ ] send chart of Kettle or Fermenter as picture works for CSV-logfiles, but time-duration is not yet implemented.
