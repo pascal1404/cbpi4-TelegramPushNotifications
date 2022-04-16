@@ -36,6 +36,4 @@ In you Telegram-chat you have a menu with commands you can use.
 Notifications will be forwarded to Telegram.
 Notifications with actions like MashIn-step-notification will get the text of the notification and the buttons. You can use the buttons in Telegram or in the dashboard, both works the same.
 
-ToDo:
-- [ ] send chart of Kettle or Fermenter as picture works for Influxdb-Cloud and CSV-logfiles should be added to influxdb v1.x
-- [ ] send chart of Kettle or Fermenter as picture works for CSV-logfiles, but time-duration is not yet implemented.
+> :warning: **_Attention:_** Command send_chart works only with influxdb v2.x

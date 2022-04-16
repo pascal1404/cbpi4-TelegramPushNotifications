@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from influxdb_client import InfluxDBClient
 from datetime import datetime
+from datetime import timedelta
 from cbpi.api import *
 from cbpi.api.config import ConfigType
 from cbpi.api.base import CBPiBase
@@ -92,7 +93,7 @@ class TelegramCallbacks(CBPiExtension):
                     await event.edit("**Choose timeframe for fermenter-chart: {}**".format(item["name"]),buttons=buttons)
             for item in kettles["data"]:
                 if item["id"] in str(event.data):
-                    buttons = [Button.inline("1h","1h"),Button.inline("2h","2h"),Button.inline("4h","4h"),Button.inline("6h","6h"),Button.inline("8h","8h"),Button.inline("12h","12h"),Button.inline("1d","1d"),Button.inline("2d","2d")]
+                    buttons = [Button.inline("1h","1h"),Button.inline("2h","2h"),Button.inline("4h","4h"),Button.inline("6h","6h"),Button.inline("8h","8h"),Button.inline("12h","12h"),Button.inline("1d","24h"),Button.inline("2d","48h")]
                     await event.edit("**Choose timeframe for kettle-chart: {}**".format(item["name"]),buttons=buttons)
         elif "timeframe" in msg.message:
             for item in fermenter["data"]:
@@ -391,12 +392,13 @@ class TelegramCallbacks(CBPiExtension):
                         else:
                             sensors.append(dict(name=value["name"],type="Power",id=value["id"]))
 
+        timestr = "-" + time[2:-1]
+
         if influxdbcloud != "No":
             if influxdbaddr is not None or influxdbuser is not None or influxdbname is not None or influxdbpwd is not None:
                 results = []
                 client = InfluxDBClient(url="https://"+influxdbaddr, token=influxdbpwd, org=influxdbuser)
                 query_api = client.query_api()
-                timestr = "-" + time[2:-1]
                 for sens in sensors:
                     query = f'from(bucket: "{influxdbname}") |> range(start: duration(v: "{timestr}")) |> filter(fn: (r) => r["itemID"] == "{sens["id"]}")'
                     result = client.query_api().query(org=influxdbuser, query=query)
@@ -410,13 +412,20 @@ class TelegramCallbacks(CBPiExtension):
         
         elif logfiles == "Yes":
             results = []
+            now = datetime.now()
+            if timestr[-1] == 'w':
+                timeref = now - timedelta(weeks=int(timestr[1:-1]))
+            elif timestr[-1] == 'h':
+                timeref = now - timedelta(hours=int(timestr[1:-1]))
             for sens in sensors:
                 log_data = await TelegramCallbacks.post_items("log/", '{"' + sens["id"] + '":""}')
                 log_dict = json.loads(log_data)
                 sensor = []
                 if "error" not in log_dict:
                     for i, timestamp in enumerate(log_dict[sens["id"]]["time"]):
-                        sensor.append([timestamp,log_dict[sens["id"]]["value"][i]])
+                        dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+                        if dt >= timeref:
+                            sensor.append([timestamp,log_dict[sens["id"]]["value"][i]])
                     
                     results.append(sensor)
 
