@@ -324,11 +324,6 @@ class TelegramCallbacks(CBPiExtension):
 
     @events.register(events.NewMessage)
     async def new_message_handler(event):
-        # if event.is_reply:
-            # replied = await event.get_reply_message()
-            # sender = replied.sender
-            # logger.warning(replied)
-            # logger.warning(sender)
         if re.search(r"(?i)moin", event.raw_text) or re.search(r"(?i)h(e|a)llo", event.raw_text) or re.search(r"(?i)hi", event.raw_text):
             sender = await event.get_sender()
             await event.respond("Hi {}, use command /help to find a list of all commands.".format(sender.first_name))
@@ -337,8 +332,6 @@ class TelegramCallbacks(CBPiExtension):
             await event.respond("Hi {}, I could not parse your text.".format(sender.first_name))
 
     async def gen_chart(id, time):
-        # sendChatAction("upload_photo")
-        
         influxdbcloud = await TelegramCallbacks.post_items("config/INFLUXDBCLOUD","")
         influxdbcloud=influxdbcloud[1:-1]
         influxdbaddr = await TelegramCallbacks.post_items("config/INFLUXDBADDR","")
@@ -431,7 +424,6 @@ class TelegramCallbacks(CBPiExtension):
 
         if results:
             plt.style.use('dark_background')
-            # plt.style.use('seaborn-darkgrid')
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
             hfmt = matplotlib.dates.DateFormatter('%H:%M:%S')

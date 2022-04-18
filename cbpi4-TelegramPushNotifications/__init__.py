@@ -141,6 +141,11 @@ class Telegram(CBPiExtension):
             except:
                 logger.warning('Unable to update config')
 
+    async def send_chart(self, id, time):
+        async with bot.action(int(telegram_chat_id), 'photo') as action:
+            await TelegramCallbacks.gen_chart(id, time)
+            await bot.send_file(int(telegram_chat_id), file='./config/upload/fig1.png', progress_callback=action.progress)
+
     async def messageEvent(self, cbpi, title, message, type, action):
         if telegram_bot_token is not None and telegram_chat_id is not None:
             id = None
