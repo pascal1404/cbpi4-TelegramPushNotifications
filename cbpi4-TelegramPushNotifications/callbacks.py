@@ -448,16 +448,20 @@ class TelegramCallbacks(CBPiExtension):
 
             ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
             ax2.set_ylabel('Power in %')
-            ax2.set_ylim(0, 100)
+            if ferm is not None:
+                ax2.set_ylim(-1, 1)
+                ax2.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1.0))
+            else:
+                ax2.set_ylim(0, 100)
             lns = None
             for i, result in enumerate(results):
                 x = [d[0] for d in result]
                 xs = matplotlib.dates.date2num(x)
                 y = [val[1] for val in result]
                 if sensors[i]["type"] == "Power":
-                    ln = ax2.plot(xs, y, color='g', label=sensors[i]["type"])
+                    ln = ax2.plot(xs, y, color='g', drawstyle='steps-post', label=sensors[i]["type"])
                 elif sensors[i]["type"] == "Target Temp":
-                    ln = ax.plot(xs, y, color='r', label=sensors[i]["type"])
+                    ln = ax.plot(xs, y, color='r', drawstyle='steps-post', label=sensors[i]["type"])
                 elif sensors[i]["type"] == "Act Temp":
                     ln = ax.plot(xs, y, color='tab:orange', label=sensors[i]["type"])
                 else:
