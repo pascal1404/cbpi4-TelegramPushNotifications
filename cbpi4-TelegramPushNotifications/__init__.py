@@ -163,6 +163,9 @@ class Telegram(CBPiExtension):
                     self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message),buttons=buttons)
                 else:
                     await bot.edit_message(int(telegram_chat_id), self.msg_last, "**{}**\n__{}__".format(title,message),buttons=buttons)
+            elif title == "Brewing Complete" and "the yeast will" in message:
+                self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message))
+                await self.send_chart(self.cbpi.config.get('MASH_TUN', None), "b'12h'")
             else:
                 if buttons:
                     self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message),buttons=buttons)
