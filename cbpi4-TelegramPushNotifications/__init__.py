@@ -167,6 +167,10 @@ class Telegram(CBPiExtension):
                 self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message))
                 await self.send_chart(self.cbpi.config.get('MASH_TUN', None), "b'12h'")
             else:
+                if self.msg_last is not None:
+                    update_msg=self.msg_last.message.split('\n')
+                    await bot.edit_message(int(telegram_chat_id), self.msg_last, "**{}**\n__{}__".format(update_msg[0],update_msg[1]), buttons=Button.clear())
+                
                 if buttons:
                     self.msg_last=await bot.send_message(int(telegram_chat_id), "**{}**\n__{}__".format(title,message),buttons=buttons)
                 else:
