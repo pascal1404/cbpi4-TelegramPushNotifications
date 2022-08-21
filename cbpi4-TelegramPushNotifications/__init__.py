@@ -11,6 +11,7 @@ import re
 import random
 import json
 import cbpi
+from .client import Client
 from .callbacks import TelegramCallbacks
 from cbpi.api import *
 from cbpi.api.config import ConfigType
@@ -43,7 +44,7 @@ class Telegram(CBPiExtension):
     async def set_commands(self):
         cmd_list = [
         {"command":"help","description":"get a list of all commands with description"},
-        {"command":"next","description":"Next Brew Step"},
+        {"command":"next","description":"next Brew Step"},
         {"command":"start","description":"start brewing"},
         {"command":"stop","description":"stop brewing"},
         {"command":"reset","description":"reset brewing"},
@@ -83,8 +84,7 @@ class Telegram(CBPiExtension):
             logger.info("Telegram Bot Listener ID: {}".format(self.listener_ID))
             
             await self.set_commands()
-            
-            bot = await TelegramClient('bot', int(telegram_api_id), telegram_api_hash).start(bot_token=telegram_bot_token)
+            bot = await Client(self.cbpi, 'bot', int(telegram_api_id), telegram_api_hash).start(bot_token=telegram_bot_token)
             bot.add_event_handler(callbacks.TelegramCallbacks.callbackQuery)
             bot.add_event_handler(callbacks.TelegramCallbacks.help)
             bot.add_event_handler(callbacks.TelegramCallbacks.next)
